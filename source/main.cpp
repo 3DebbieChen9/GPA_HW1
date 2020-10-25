@@ -36,7 +36,56 @@ typedef struct
 	GLuint m_texture;
 } Shape;
 
-Shape m_shape;
+class Node {
+public:
+	Shape* linkedShape;
+	vec3 pos;
+	quat rotation;
+
+	Node* parent;
+	Node* child;
+	Node* sibling;
+
+	mat4 getModelMatrix();
+	void addChild(Node* child);
+	void drawNode(Node* node);
+	/*void traverse(Uniforms uniforms);
+	void draw(Uniforms uniforms);*/
+
+};
+
+void Node::addChild(Node* child) {
+	if (this->child == NULL) {
+		this->child = child;
+	}
+	else {
+		Node* lastSibling = this->child;
+		while (lastSibling->sibling != NULL) {
+			lastSibling = lastSibling->sibling;
+		}
+		lastSibling->sibling = child;
+	}
+	child->parent = this;
+}
+
+//mat4 Node::getModelMatrix() {
+//	mat4 translateMatrix = translate(this->pos);
+//	mat4 rotationMatrix = toMat4(this->rotation);
+//
+//	if (parent) {
+//		return parent->getModelMatrix() * translateMatrix * rotationMatrix;
+//	}
+//	else {
+//		return translateMatrix * rotationMatrix;
+//	}
+//}
+
+//void Node::drawNode(Node* node) {
+//
+//}
+
+Shape input_shape[3];
+Node* body = new Node();
 
 // Load shader file to program
 char** loadShaderSource(const char* file)
@@ -63,86 +112,99 @@ void freeShaderSource(char** srcp)
 // Load .obj model
 void My_LoadModels()
 {
-	tinyobj::attrib_t attrib;
-	vector<tinyobj::shape_t> shapes;
-	vector<tinyobj::material_t> materials;
-	string warn;
-	string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "ladybug.obj");
-	if (!warn.empty()) {
-		cout << warn << endl;
-	}
-	if (!err.empty()) {
-		cout << err << endl;
-	}
-	if (!ret) {
-		exit(1);
-	}
+	// use for loop to load multiple .obj model
+	/*vector<string> objNames;
+	objNames.push_back("Capsule.obj");
+	objNames.push_back("Cube.obj");
+	objNames.push_back("Sphere.obj");*/
 
-	vector<float> vertices, texcoords, normals;  // if OBJ preserves vertex order, you can use element array buffer for memory efficiency
-	for (int s = 0; s < shapes.size(); ++s) {  // for 'ladybug.obj', there is only one object
-		int index_offset = 0;
-		for (int f = 0; f < shapes[s].mesh.num_face_vertices.size(); ++f) {
-			int fv = shapes[s].mesh.num_face_vertices[f];
-			for (int v = 0; v < fv; ++v) {
-				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 0]);
-				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 1]);
-				vertices.push_back(attrib.vertices[3 * idx.vertex_index + 2]);
-				texcoords.push_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
-				texcoords.push_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
-				normals.push_back(attrib.normals[3 * idx.normal_index + 0]);
-				normals.push_back(attrib.normals[3 * idx.normal_index + 1]);
-				normals.push_back(attrib.normals[3 * idx.normal_index + 2]);
-			}
-			index_offset += fv;
-			m_shape.vertexCount += fv;
+	const char* objNames[3] = { "Capsule.obj", "Cube.obj", "Sphere.obj" };
+
+	for (int i = 0; i < (sizeof(objNames) / sizeof(objNames[0])); i++) {
+		tinyobj::attrib_t attrib;
+		vector<tinyobj::shape_t> shapes;
+		vector<tinyobj::material_t> materials;
+		string warn;
+		string err;
+
+		bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objNames[i]);
+		if (!warn.empty()) {
+			std::cout << warn << endl;
 		}
+		if (!err.empty()) {
+			std::cout << err << endl;
+		}
+		if (!ret) {
+			exit(1);
+		}
+
+		vector<float> vertices, texcoords, normals;  // if OBJ preserves vertex order, you can use element array buffer for memory efficiency
+		for (int s = 0; s < shapes.size(); ++s) {  // for 'ladybug.obj', there is only one object
+			int index_offset = 0;
+			for (int f = 0; f < shapes[s].mesh.num_face_vertices.size(); ++f) {
+				int fv = shapes[s].mesh.num_face_vertices[f];
+				for (int v = 0; v < fv; ++v) {
+					tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+					vertices.push_back(attrib.vertices[3 * idx.vertex_index + 0]);
+					vertices.push_back(attrib.vertices[3 * idx.vertex_index + 1]);
+					vertices.push_back(attrib.vertices[3 * idx.vertex_index + 2]);
+					texcoords.push_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
+					texcoords.push_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
+					normals.push_back(attrib.normals[3 * idx.normal_index + 0]);
+					normals.push_back(attrib.normals[3 * idx.normal_index + 1]);
+					normals.push_back(attrib.normals[3 * idx.normal_index + 2]);
+				}
+				index_offset += fv;
+				input_shape[i].vertexCount += fv;
+			}
+		}
+
+		glGenVertexArrays(1, &input_shape[i].vao);
+		glBindVertexArray(input_shape[i].vao);
+
+		glGenBuffers(1, &input_shape[i].vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, input_shape[i].vbo);
+
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float) + texcoords.size() * sizeof(float) + normals.size() * sizeof(float), NULL, GL_STATIC_DRAW);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(float), vertices.data());
+		glBufferSubData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), texcoords.size() * sizeof(float), texcoords.data());
+		glBufferSubData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float) + texcoords.size() * sizeof(float), normals.size() * sizeof(float), normals.data());
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)(vertices.size() * sizeof(float)));
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)(vertices.size() * sizeof(float) + texcoords.size() * sizeof(float)));
+		glEnableVertexAttribArray(2);
+
+		shapes.clear();
+		shapes.shrink_to_fit();
+		materials.clear();
+		materials.shrink_to_fit();
+		vertices.clear();
+		vertices.shrink_to_fit();
+		texcoords.clear();
+		texcoords.shrink_to_fit();
+		normals.clear();
+		normals.shrink_to_fit();
+
+		std::cout << "Load " << input_shape[i].vertexCount << " vertices" << endl;
+
+		texture_data tdata = load_img("ladybug_diff.png");
+
+		glGenTextures(1, &input_shape[i].m_texture);
+		glBindTexture(GL_TEXTURE_2D, input_shape[i].m_texture);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, tdata.width, tdata.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tdata.data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		delete tdata.data;
 	}
 
-	glGenVertexArrays(1, &m_shape.vao);
-	glBindVertexArray(m_shape.vao);
-
-	glGenBuffers(1, &m_shape.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, m_shape.vbo);
-
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float) + texcoords.size() * sizeof(float) + normals.size() * sizeof(float), NULL, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(float), vertices.data());
-	glBufferSubData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), texcoords.size() * sizeof(float), texcoords.data());
-	glBufferSubData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float) + texcoords.size() * sizeof(float), normals.size() * sizeof(float), normals.data());
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)(vertices.size() * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)(vertices.size() * sizeof(float) + texcoords.size() * sizeof(float)));
-	glEnableVertexAttribArray(2);
-
-	shapes.clear();
-	shapes.shrink_to_fit();
-	materials.clear();
-	materials.shrink_to_fit();
-	vertices.clear();
-	vertices.shrink_to_fit();
-	texcoords.clear();
-	texcoords.shrink_to_fit();
-	normals.clear();
-	normals.shrink_to_fit();
-
-	cout << "Load " << m_shape.vertexCount << " vertices" << endl;
-
-	texture_data tdata = load_img("ladybug_diff.png");
-
-	glGenTextures(1, &m_shape.m_texture);
-	glBindTexture(GL_TEXTURE_2D, m_shape.m_texture);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, tdata.width, tdata.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tdata.data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	delete tdata.data;
+	
 }
 
 // OpenGL initialization
@@ -194,6 +256,8 @@ void My_Init()
 	My_LoadModels();
 }
 
+
+
 // GLUT callback. Called to draw the scene.
 void My_Display()
 {
@@ -201,27 +265,41 @@ void My_Display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// Bind a vertex array for OpenGL (OpenGL will apply operation only to the vertex array objects it bind)
-	glBindVertexArray(m_shape.vao);
+	
+	// body
+	glBindVertexArray(input_shape[1].vao);
+	body->linkedShape = &input_shape[1];
+	body->pos = vec3(0.0, 0.0, 0.0);
+	/*body->rotation = */
+	body->parent = NULL;
+	body->child = NULL;
+	body->sibling = NULL;
 
 	// Tell openGL to use the shader program we created before
 	glUseProgram(program);
 
 
-	// Todo
-	// Practice 2 : Build 2 matrix (translation matrix and rotation matrix)
-	// then multiply these matrix with proper order
-	// final result should restore in the variable 'model'
-	
-	// Build translation matrix
-	mat4 translation_matrix = translate(mat4(1.0f), temp);
+	//// Todo
+	//// Practice 2 : Build 2 matrix (translation matrix and rotation matrix)
+	//// then multiply these matrix with proper order
+	//// final result should restore in the variable 'model'
+	//
+	//// Build translation matrix
+	//mat4 translation_matrix = translate(mat4(1.0f), temp);
 
-	// Build rotation matrix
+	//// Build rotation matrix
+	//vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
+	//mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+
+	//// model = matrix_A * matrix_B
+	//model = translation_matrix * rotation_matrix;
+
+	
+
+	mat4 translation_matrix = translate(mat4(1.0f), temp);
 	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
 	mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
-
-	// model = matrix_A * matrix_B
 	model = translation_matrix * rotation_matrix;
-
 
 	// Transfer value of (view*model) to both shader's inner variable 'um4mv'; 
 	glUniformMatrix4fv(um4mv, 1, GL_FALSE, value_ptr(view * model));
@@ -230,7 +308,7 @@ void My_Display()
 	glUniformMatrix4fv(um4p, 1, GL_FALSE, value_ptr(projection));
 
 	// Tell openGL to draw the vertex array we had binded before
-	glDrawArrays(GL_TRIANGLES, 0, m_shape.vertexCount);
+	glDrawArrays(GL_TRIANGLES, 0, input_shape[1].vertexCount);
 
 	// Change current display buffer to another one (refresh frame) 
 	glutSwapBuffers();
@@ -365,7 +443,7 @@ int main(int argc, char *argv[])
 #endif
 	glutInitWindowPosition(100, 100);
 	glutInitWindowSize(600, 600);
-	glutCreateWindow("Practice"); // You cannot use OpenGL functions before this line;
+	glutCreateWindow("Homework 1: Robot"); // You cannot use OpenGL functions before this line;
 								  // The OpenGL context must be created first by glutCreateWindow()!
 #ifdef _MSC_VER
 	glewInit();
