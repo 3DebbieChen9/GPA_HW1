@@ -26,7 +26,7 @@ GLint um4mv;
 
 GLuint program;			// shader program id
 
-typedef struct
+struct Shape
 {
 	GLuint vao;			// vertex array object
 	GLuint vbo;			// vertex buffer object
@@ -34,39 +34,44 @@ typedef struct
 	int materialId;
 	int vertexCount;
 	GLuint m_texture;
-} Shape;
+	Shape* parent;
 
-class Node {
-public:
-	Shape* linkedShape;
-	vec3 pos;
-	quat rotation;
-
-	Node* parent;
-	Node* child;
-	Node* sibling;
-
-	mat4 getModelMatrix();
-	void addChild(Node* child);
-	void drawNode(Node* node);
-	/*void traverse(Uniforms uniforms);
-	void draw(Uniforms uniforms);*/
+	mat4 translateMatrix;
+	mat4 rotationMatrix;
 
 };
 
-void Node::addChild(Node* child) {
-	if (this->child == NULL) {
-		this->child = child;
-	}
-	else {
-		Node* lastSibling = this->child;
-		while (lastSibling->sibling != NULL) {
-			lastSibling = lastSibling->sibling;
-		}
-		lastSibling->sibling = child;
-	}
-	child->parent = this;
-}
+//class Node {
+//public:
+//	Shape* linkedShape;
+//	vec3 pos;
+//	quat rotation;
+//
+//	Node* parent;
+//	Node* child;
+//	Node* sibling;
+//
+//	mat4 getModelMatrix();
+//	void addChild(Node* child);
+//	void drawNode(Node* node);
+//	/*void traverse(Uniforms uniforms);
+//	void draw(Uniforms uniforms);*/
+//
+//};
+
+//void Node::addChild(Node* child) {
+//	if (this->child == NULL) {
+//		this->child = child;
+//	}
+//	else {
+//		Node* lastSibling = this->child;
+//		while (lastSibling->sibling != NULL) {
+//			lastSibling = lastSibling->sibling;
+//		}
+//		lastSibling->sibling = child;
+//	}
+//	child->parent = this;
+//}
 
 //mat4 Node::getModelMatrix() {
 //	mat4 translateMatrix = translate(this->pos);
@@ -80,12 +85,8 @@ void Node::addChild(Node* child) {
 //	}
 //}
 
-//void Node::drawNode(Node* node) {
-//
-//}
 
-Shape input_shape[3];
-Node* body = new Node();
+Shape m_shapes[10];
 
 // Load shader file to program
 char** loadShaderSource(const char* file)
@@ -113,12 +114,9 @@ void freeShaderSource(char** srcp)
 void My_LoadModels()
 {
 	// use for loop to load multiple .obj model
-	/*vector<string> objNames;
-	objNames.push_back("Capsule.obj");
-	objNames.push_back("Cube.obj");
-	objNames.push_back("Sphere.obj");*/
 
-	const char* objNames[3] = { "Capsule.obj", "Cube.obj", "Sphere.obj" };
+	const char* objNames[10] = { "body.obj", "rightarm.obj", "leftarm.obj", "rightleg.obj", 
+		"leftleg.obj", "head.obj", "righthand.obj", "lefthand.obj", "rightfoot.obj", "leftfoot.obj" };
 
 	for (int i = 0; i < (sizeof(objNames) / sizeof(objNames[0])); i++) {
 		tinyobj::attrib_t attrib;
@@ -155,15 +153,15 @@ void My_LoadModels()
 					normals.push_back(attrib.normals[3 * idx.normal_index + 2]);
 				}
 				index_offset += fv;
-				input_shape[i].vertexCount += fv;
+				m_shapes[i].vertexCount += fv;
 			}
 		}
 
-		glGenVertexArrays(1, &input_shape[i].vao);
-		glBindVertexArray(input_shape[i].vao);
+		glGenVertexArrays(1, &m_shapes[i].vao);
+		glBindVertexArray(m_shapes[i].vao);
 
-		glGenBuffers(1, &input_shape[i].vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, input_shape[i].vbo);
+		glGenBuffers(1, &m_shapes[i].vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, m_shapes[i].vbo);
 
 		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float) + texcoords.size() * sizeof(float) + normals.size() * sizeof(float), NULL, GL_STATIC_DRAW);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(float), vertices.data());
@@ -188,12 +186,12 @@ void My_LoadModels()
 		normals.clear();
 		normals.shrink_to_fit();
 
-		std::cout << "Load " << input_shape[i].vertexCount << " vertices" << endl;
+		std::cout << "Load " << m_shapes[i].vertexCount << " vertices" << endl;
 
 		texture_data tdata = load_img("ladybug_diff.png");
 
-		glGenTextures(1, &input_shape[i].m_texture);
-		glBindTexture(GL_TEXTURE_2D, input_shape[i].m_texture);
+		glGenTextures(1, &m_shapes[i].m_texture);
+		glBindTexture(GL_TEXTURE_2D, m_shapes[i].m_texture);
 
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, tdata.width, tdata.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tdata.data);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -205,6 +203,17 @@ void My_LoadModels()
 	}
 
 	
+}
+
+void My_framework() 
+{
+	m_shapes[0].parent = NULL;
+	for (int i = 1; i < 5; i++) {
+		m_shapes[i].parent = &m_shapes[0];
+	}
+	for (int i = 6; i < 10; i++) {
+		m_shapes[i].parent = &m_shapes[i - 5];
+	}
 }
 
 // OpenGL initialization
@@ -252,63 +261,57 @@ void My_Init()
 
 	// Tell OpenGL to use this shader program now
 	glUseProgram(program);
-
+	My_framework();
 	My_LoadModels();
 }
 
 
+void My_NodeMatrix() 
+{
+	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
+	m_shapes[0].translateMatrix = translate(mat4(1.0f), temp);
+	m_shapes[0].rotationMatrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+	mat4 tmpTranslateMat = translate(mat4(1.0f), temp);
 
+
+	//for (int i = 1; i < 10; i++) {
+	//	m_shapes[i].translateMatrix = tmpTranslateMat
+	//}
+
+}
 // GLUT callback. Called to draw the scene.
 void My_Display()
 {
 	// Clear display buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Bind a vertex array for OpenGL (OpenGL will apply operation only to the vertex array objects it bind)
-	
-	// body
-	glBindVertexArray(input_shape[1].vao);
-	body->linkedShape = &input_shape[1];
-	body->pos = vec3(0.0, 0.0, 0.0);
-	/*body->rotation = */
-	body->parent = NULL;
-	body->child = NULL;
-	body->sibling = NULL;
-
 	// Tell openGL to use the shader program we created before
 	glUseProgram(program);
 
-
-	//// Todo
-	//// Practice 2 : Build 2 matrix (translation matrix and rotation matrix)
-	//// then multiply these matrix with proper order
 	//// final result should restore in the variable 'model'
-	//
 	//// Build translation matrix
-	//mat4 translation_matrix = translate(mat4(1.0f), temp);
+	mat4 translation_matrix = translate(mat4(1.0f), temp);
 
 	//// Build rotation matrix
-	//vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
-	//mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
-
-	//// model = matrix_A * matrix_B
-	//model = translation_matrix * rotation_matrix;
-
-	
-
-	mat4 translation_matrix = translate(mat4(1.0f), temp);
 	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
 	mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+
+	//// model = matrix_A * matrix_B
 	model = translation_matrix * rotation_matrix;
 
-	// Transfer value of (view*model) to both shader's inner variable 'um4mv'; 
-	glUniformMatrix4fv(um4mv, 1, GL_FALSE, value_ptr(view * model));
+	for (int i = 0; i < 10; i++) {
+		// Bind a vertex array for OpenGL (OpenGL will apply operation only to the vertex array objects it bind)
+		glBindVertexArray(m_shapes[i].vao);
 
-	// Transfer value of projection to both shader's inner variable 'um4p';
-	glUniformMatrix4fv(um4p, 1, GL_FALSE, value_ptr(projection));
+		// Transfer value of (view*model) to both shader's inner variable 'um4mv'; 
+		glUniformMatrix4fv(um4mv, 1, GL_FALSE, value_ptr(view * model));
 
-	// Tell openGL to draw the vertex array we had binded before
-	glDrawArrays(GL_TRIANGLES, 0, input_shape[1].vertexCount);
+		// Transfer value of projection to both shader's inner variable 'um4p';
+		glUniformMatrix4fv(um4p, 1, GL_FALSE, value_ptr(projection));
+
+		// Tell openGL to draw the vertex array we had binded before
+		glDrawArrays(GL_TRIANGLES, 0, m_shapes[i].vertexCount);
+	}
 
 	// Change current display buffer to another one (refresh frame) 
 	glutSwapBuffers();
