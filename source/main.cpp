@@ -5,8 +5,13 @@
 #define MENU_TIMER_START 1
 #define MENU_TIMER_STOP 2
 #define MENU_EXIT 3
-#define MENU_HELLO 4
-#define MENU_WORLD 5
+#define MENU_WALK 4
+#define MENU_JUMP 5
+#define MENU_DEFAULT 6
+
+#define STATE_DEFAULT 1
+#define STATE_WALK 2
+#define STATE_JUMP 3
 
 //GLUT timer variable
 float timer_cnt = 0;
@@ -38,8 +43,24 @@ struct Shape
 
 	mat4 translateMatrix;
 	mat4 rotationMatrix;
+	mat4 nodeModel;
 
 };
+
+struct Center {
+	vec3 body = vec3(0, 0, 0);
+	vec3 rightArm = vec3(-0.096832, -4.3374, 3.40726);
+	vec3 leftArm = vec3(-0.096832, -4.3374, 3.40726);
+	vec3 rightLeg = vec3(-0.096832, -1.43804, -5.0228);
+	vec3 leftLeg = vec3(-0.096832, 1.30501, -5.0228);
+	vec3 head = vec3(-0.012209, 1.29605, -8.61114);
+	bool head_upper_bound = false;
+	vec3 rightHand = vec3(-0.012209, -4.34635, -0.181083);
+	vec3 leftHand = vec3(-0.012209, 4.48602, -0.181083);
+	vec3 rightFoot = vec3(-0.012209, -1.44699, -8.61114);
+	vec3 leftFoot = vec3(-0.012209, 1.29605, -8.61114);
+};
+
 
 //class Node {
 //public:
@@ -85,8 +106,9 @@ struct Shape
 //	}
 //}
 
-
+Center m_center;
 Shape m_shapes[10];
+int m_state = STATE_WALK;
 
 // Load shader file to program
 char** loadShaderSource(const char* file)
@@ -118,7 +140,7 @@ void My_LoadModels()
 	const char* objNames[10] = { "body.obj", "rightarm.obj", "leftarm.obj", "rightleg.obj", 
 		"leftleg.obj", "head.obj", "righthand.obj", "lefthand.obj", "rightfoot.obj", "leftfoot.obj" };
 
-	for (int i = 0; i < (sizeof(objNames) / sizeof(objNames[0])); i++) {
+	for (int i = 0; i < 10; i++) {
 		tinyobj::attrib_t attrib;
 		vector<tinyobj::shape_t> shapes;
 		vector<tinyobj::material_t> materials;
@@ -186,9 +208,9 @@ void My_LoadModels()
 		normals.clear();
 		normals.shrink_to_fit();
 
-		std::cout << "Load " << m_shapes[i].vertexCount << " vertices" << endl;
+		std::cout << "Load " << objNames[i] << " | " << m_shapes[i].vertexCount << " vertices" << endl;
 
-		texture_data tdata = load_img("ladybug_diff.png");
+		texture_data tdata = load_img("unsplash.jpg");
 
 		glGenTextures(1, &m_shapes[i].m_texture);
 		glBindTexture(GL_TEXTURE_2D, m_shapes[i].m_texture);
@@ -201,7 +223,6 @@ void My_LoadModels()
 
 		delete tdata.data;
 	}
-
 	
 }
 
@@ -214,6 +235,7 @@ void My_framework()
 	for (int i = 6; i < 10; i++) {
 		m_shapes[i].parent = &m_shapes[i - 5];
 	}
+	std::cout << "My_framework() DONE" << endl;
 }
 
 // OpenGL initialization
@@ -263,22 +285,98 @@ void My_Init()
 	glUseProgram(program);
 	My_framework();
 	My_LoadModels();
+	std::cout << "Initial Done" << endl;
 }
 
 
-void My_NodeMatrix() 
+//void My_NodeMatrix() 
+//{
+//	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
+//	m_shapes[0].translateMatrix = translate(mat4(1.0f), temp);
+//	m_shapes[0].rotationMatrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+//	mat4 tmpTranslateMat = translate(mat4(1.0f), temp);
+//
+//
+//	//for (int i = 1; i < 10; i++) {
+//	//	m_shapes[i].translateMatrix = tmpTranslateMat
+//	//}
+//
+//}
+
+mat4 My_Model(int index, int state)
 {
-	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
-	m_shapes[0].translateMatrix = translate(mat4(1.0f), temp);
-	m_shapes[0].rotationMatrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
-	mat4 tmpTranslateMat = translate(mat4(1.0f), temp);
+	mat4 my_model(1.0f);
+	mat4 translation_matrix = translate(mat4(1.0f), temp);
+	vec3 rotate_axis = vec3(0.0, 0.0, 0.0);
+	mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+	
+	switch (state) {
+		case STATE_WALK:
+		{
+			switch (index) {
+				case 0: 
+				{
+					my_model = translation_matrix;
+				}
+					break;
+				case 1: 
+				{
+					translation_matrix = translate(mat4(1.0f), m_center.rightArm);
+					rotate_axis = vec3(0.0, 0.0, 1.0);
+					// 0~45, 315~360
+					rotation_matrix = rotate(mat4(1.0f), radians(315.0f), rotate_axis);
+					my_model = inverse(translation_matrix) * rotation_matrix * translation_matrix;
+					/*my_model = m_shapes[index].parent->nodeModel * inverse(translation_matrix) * rotation_matrix * translation_matrix;
+					m_shapes[index].nodeModel = my_model;*/
+				}
+					break;
+				case 5:
+				{
+					translation_matrix = translate(mat4(1.0f), m_center.head);
+					rotate_axis = vec3(0.0, 0.0, 1.0);
+					/*float x = 0;
+					if (m_center.head_upper_bound) {
+						x = 375 - (timer_cnt - int(timer_cnt / 30) * 30);
+						if (x == 345) {
+							m_center.head_upper_bound = false;
+						}
+					}
+					else {
+						x = 345 + (timer_cnt - int(timer_cnt / 30) * 30);
+						if (x == 375) {
+							m_center.head_upper_bound = true;
+						}
+					}*/
+					float x = sin(0.03 * timer_cnt) * 5;
+					rotation_matrix = rotate(mat4(1.0f), radians(x), rotate_axis);
+					my_model = inverse(translation_matrix) * rotation_matrix * translation_matrix;
+					/*my_model = m_shapes[index].parent->nodeModel * inverse(translation_matrix) * rotation_matrix * translation_matrix;
+					m_shapes[index].nodeModel = my_model;*/
+				}
+					break;
+				default:
+					//my_model = m_shapes[index].parent->nodeModel * inverse(translation_matrix) * rotation_matrix * translation_matrix;
+					//m_shapes[index].nodeModel = my_model;
+					my_model = translation_matrix;
+					break;
+			}
+		}
+			break;
+		case STATE_JUMP:
+			my_model = translation_matrix;
+			break;
+		default: // _Default
+			/*my_model = translation_matrix * rotation_matrix;*/
+			my_model = translation_matrix;
+			//my_model = m_shapes[index].parent->nodeModel * inverse(translation_matrix) * rotation_matrix * translation_matrix;
+			//m_shapes[index].nodeModel = my_model;
+			break;
+	}
 
-
-	//for (int i = 1; i < 10; i++) {
-	//	m_shapes[i].translateMatrix = tmpTranslateMat
-	//}
+	return my_model;
 
 }
+
 // GLUT callback. Called to draw the scene.
 void My_Display()
 {
@@ -290,18 +388,26 @@ void My_Display()
 
 	//// final result should restore in the variable 'model'
 	//// Build translation matrix
-	mat4 translation_matrix = translate(mat4(1.0f), temp);
+	//mat4 translation_matrix = translate(mat4(1.0f), temp);
 
-	//// Build rotation matrix
-	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
-	mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
+	////// Build rotation matrix
+	//vec3 rotate_axis = vec3(1.0, 0.0, 0.0);
+	//mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
 
 	//// model = matrix_A * matrix_B
-	model = translation_matrix * rotation_matrix;
+	//model = translation_matrix * rotation_matrix;
+
+	// model = T * R * T^-1
+
+	mat4 translation_matrix = translate(mat4(1.0f), temp);
+	vec3 rotate_axis = vec3(0.0, 1.0, 0.0);
+	mat4 rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
 
 	for (int i = 0; i < 10; i++) {
 		// Bind a vertex array for OpenGL (OpenGL will apply operation only to the vertex array objects it bind)
 		glBindVertexArray(m_shapes[i].vao);
+
+		model = My_Model(i, m_state);
 
 		// Transfer value of (view*model) to both shader's inner variable 'um4mv'; 
 		glUniformMatrix4fv(um4mv, 1, GL_FALSE, value_ptr(view * model));
@@ -400,11 +506,16 @@ void My_Menu(int id)
 	case MENU_EXIT:
 		exit(0);
 		break;
-	case MENU_HELLO:
+	case MENU_WALK:
 		// do something
+		m_state = STATE_WALK;
 		break;
-	case MENU_WORLD:
+	case MENU_JUMP:
 		// do something
+		m_state = STATE_JUMP;
+		break;
+	case MENU_DEFAULT:
+		m_state = STATE_DEFAULT;
 		break;
 	default:
 		break;
@@ -460,7 +571,7 @@ int main(int argc, char *argv[])
 
 	glutSetMenu(menu_main);
 	glutAddSubMenu("Timer", menu_timer);
-	glutAddSubMenu("New", menu_new);
+	glutAddSubMenu("Action", menu_new);
 	glutAddMenuEntry("Exit", MENU_EXIT);
 
 	glutSetMenu(menu_timer);
@@ -468,8 +579,9 @@ int main(int argc, char *argv[])
 	glutAddMenuEntry("Stop", MENU_TIMER_STOP);
 
 	glutSetMenu(menu_new);						// Tell GLUT to design the menu which id==menu_new now
-	glutAddMenuEntry("Hello", MENU_HELLO);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
-	glutAddMenuEntry("World", MENU_WORLD);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
+	glutAddMenuEntry("Walking", MENU_WALK);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
+	glutAddMenuEntry("Mario Jump", MENU_JUMP);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
+	glutAddMenuEntry("Default", MENU_DEFAULT);
 
 	glutSetMenu(menu_main);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
