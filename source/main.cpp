@@ -270,21 +270,21 @@ mat4 My_Model(int index, int state)
 				case 2: // leftArm
 				{	
 					// 0~45, 315~360
-					float angle = cos(0.03 * timer_cnt) * 45;
+					float angle = (- sin(0.03 * timer_cnt)) * 45;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 3: // rightLeg
 				{	
 					// 0~45, 315~360
-					float angle = cos(0.03 * timer_cnt) * 45;
+					float angle = (- sin(0.03 * timer_cnt)) * 30;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 4: // leftLeg
 				{	
 					// 0~45, 315~360
-					float angle = sin(0.03 * timer_cnt) * 45;
+					float angle = sin(0.03 * timer_cnt) * 30;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
@@ -297,28 +297,24 @@ mat4 My_Model(int index, int state)
 				case 6: // rightHand
 				{
 					// 0~45, 315~360
-					//float angle = sin(0.01 * timer_cnt) * 45;
 					float angle = sin(0.05 * timer_cnt) * 25;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 7: // leftHand
 				{
-					//float angle = cos(0.01 * timer_cnt) * 45;
-					float angle = sin(0.05 * timer_cnt) * 25;
+					float angle = (-sin(0.05 * timer_cnt)) * 25;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 8: // rightFoot
 				{
-					//float angle = cos(0.01 * timer_cnt) * 45;
-					float angle = sin(0.05 * timer_cnt) * 25;
+					float angle = (-sin(0.05 * timer_cnt)) * 25;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 9: // leftLeg
 				{
-					//float angle = sin(0.01 * timer_cnt) * 45;
 					float angle = sin(0.05 * timer_cnt) * 25;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
@@ -337,7 +333,9 @@ mat4 My_Model(int index, int state)
 		}
 			break;
 		case STATE_JUMP:
-			my_model = move_matrix;
+			rotate_axis = vec3(0.0, 1.0, 0.0);
+			rotation_matrix = rotate(mat4(1.0f), radians(mouseAngle), rotate_axis);
+			my_model = move_matrix * rotation_matrix;
 			break;
 		default: // _Default
 			rotate_axis = vec3(0.0, 1.0, 0.0);
