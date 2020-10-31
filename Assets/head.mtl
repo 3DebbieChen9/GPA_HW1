@@ -1,10 +1,13 @@
-# Blender MTL File: 'None'
+# Blender MTL File: 'optimus.blend'
 # Material Count: 1
 
-newmtl None
-Ns 500
-Ka 0.8 0.8 0.8
-Kd 0.8 0.8 0.8
-Ks 0.8 0.8 0.8
-d 1
-illum 2
+newmtl RB_OptimusHead_MATINST
+Ns 10.000002
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd C:\\Users\\Debbie\\Desktop\\NTHU\\GPA_HW(ASUS)\\GPA_HW1\\models\\Optimus\\RB_OptimusHead_TEXTSET_Color_NormX.png

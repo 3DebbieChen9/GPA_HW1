@@ -1,17 +1,14 @@
 #include "../Include/Common.h"
 
-
 //For GLUT to handle 
 #define MENU_TIMER_START 1
 #define MENU_TIMER_STOP 2
 #define MENU_EXIT 3
 #define MENU_WALK 4
-#define MENU_JUMP 5
 #define MENU_DEFAULT 6
 
 #define STATE_DEFAULT 1
 #define STATE_WALK 2
-#define STATE_JUMP 3
 
 //GLUT timer variable
 float timer_cnt = 0;
@@ -24,8 +21,13 @@ using namespace std;
 mat4 view(1.0f);			// V of MVP, viewing matrix
 mat4 projection(1.0f);		// P of MVP, projection matrix
 mat4 model(1.0f);			// M of MVP, model matrix
-vec3 temp = vec3();			// a 3 dimension vector which represents how far did the ladybug should move
-float mouseAngle = -45.0f;
+vec3 temp = vec3(0, 3, 0);			// a 3 dimension vector which represents how far did the optimus should move
+
+float mouseAngle = 135.0f;
+float angleChange = 0.0f;
+bool startRotate = false;
+
+float freq = 0.03;
 
 GLint um4p;
 GLint um4mv;
@@ -149,19 +151,21 @@ void My_LoadModels()
 
 		std::cout << "Load " << objNames[i] << " | " << m_shapes[i].vertexCount << " vertices" << endl;
 
-		texture_data tdata = load_img("optimus.png");
-
 		glGenTextures(1, &m_shapes[i].m_texture);
 		glBindTexture(GL_TEXTURE_2D, m_shapes[i].m_texture);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, tdata.width, tdata.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tdata.data);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		delete tdata.data;
+		
 	}
+	texture_data tdata = load_img("RB_Optimus.png");
+
+	
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, tdata.width, tdata.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, tdata.data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	delete tdata.data;
 	
 }
 
@@ -175,15 +179,19 @@ void My_framework()
 		m_shapes[i].parent = &m_shapes[i - 5];
 	}
 	m_shapes[0].center = vec3(0, 0, 0); // body
-	m_shapes[1].center = vec3(-0.096832, -4.3374, 3.40726); // rightArm
-	m_shapes[2].center = vec3(-0.096832, -4.3374, 3.40726); // leftArm
-	m_shapes[3].center = vec3(-0.096832, -1.43804, -5.0228); // rightLeg
-	m_shapes[4].center = vec3(-0.096832,  1.30501, -5.0228); // leftLeg
-	m_shapes[5].center = vec3(-0.012209, 1.29605, -8.61114); // head
-	m_shapes[6].center = vec3(-0.012209, -4.34635, -0.181083); // rightHand
-	m_shapes[7].center = vec3(-0.012209, -4.48602, -0.181083); // leftHand
-	m_shapes[8].center = vec3(-0.012209, -1.44699, -8.61114); // rightFoot
-	m_shapes[9].center = vec3(-0.012209,  1.29605, -8.61114); // leftFoot
+	m_shapes[1].center = vec3(-5.33288, 83.0472, -172.447); // rightArm
+	m_shapes[2].center = vec3(-5.33288, 83.0472, 172.444); // leftArm
+	m_shapes[3].center = vec3(19.6564, -114.218, -57.4393); // rightLeg
+	m_shapes[4].center = vec3(19.6564, -114.218, 57.4393); // leftLeg
+	m_shapes[5].center = vec3(10.3625, 136.248, 0.587848); // head
+	m_shapes[6].center = vec3(-25.7367, -50.9645, -215.277); // rightHand
+	m_shapes[7].center = vec3(-25.7367, -50.9645, 215.277); // leftHand
+	m_shapes[8].center = vec3(32.2727, -280.651, -82.3083); // rightFoot
+	m_shapes[9].center = vec3(32.2727, -280.651, 82.3083); // leftFoot
+
+	for (int i = 1; i < 10; i++) {
+		m_shapes[i].center = m_shapes[i].center - m_shapes[i].parent->center;
+	}
 
 	std::cout << "My_framework() DONE" << endl;
 }
@@ -238,20 +246,29 @@ void My_Init()
 	std::cout << "Initial Done" << endl;
 }
 
-
+void My_mouseRotate() 
+{
+	if (startRotate) {
+		angleChange += 0.03f;
+	}
+	else {
+		angleChange = 0.0f;
+	}
+	mouseAngle += angleChange;
+}
 
 mat4 My_Model(int index, int state)
 {
 	mat4 my_model(1.0f);
-	mat4 translation_matrix(1.0f);
+	mat4 translation_matrix = translate(mat4(1.0f), m_shapes[index].center);
 	mat4 move_matrix = translate(mat4(1.0f), temp);
 	vec3 rotate_axis = vec3();
 	mat4 rotation_matrix(1.0f);
-	
+	mat4 scale_matrix = scale(mat4(1.0f), vec3(0.01, 0.01, 0.01));
+
 	switch (state) {
 		case STATE_WALK:
 		{
-			translation_matrix = translate(mat4(1.0f), m_shapes[index].center);
 			rotate_axis = vec3(0.0, 0.0, 1.0);
 			switch (index) {
 				case 0: // body
@@ -262,60 +279,55 @@ mat4 My_Model(int index, int state)
 					break;
 				case 1: // rightArm
 				{
-					// 0~45, 315~360
-					float angle = sin(0.03 * timer_cnt) * 45;
+					float angle = sin(freq * timer_cnt) * 30;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 2: // leftArm
 				{	
-					// 0~45, 315~360
-					float angle = (- sin(0.03 * timer_cnt)) * 45;
+					float angle = (- sin(freq * timer_cnt)) * 30;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 3: // rightLeg
 				{	
-					// 0~45, 315~360
-					float angle = (- sin(0.03 * timer_cnt)) * 30;
+					float angle = (- sin(freq * timer_cnt)) * 20;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 4: // leftLeg
 				{	
-					// 0~45, 315~360
-					float angle = sin(0.03 * timer_cnt) * 30;
+					float angle = sin(freq * timer_cnt) * 20;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 5: // head
 				{
-					float angle = sin(0.03 * timer_cnt) * 5;
+					float angle = sin(freq * timer_cnt) * 5;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 6: // rightHand
 				{
-					// 0~45, 315~360
-					float angle = sin(0.05 * timer_cnt) * 25;
+					float angle = sin(freq * timer_cnt) * 15;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 7: // leftHand
 				{
-					float angle = (-sin(0.05 * timer_cnt)) * 25;
+					float angle = (-sin(freq * timer_cnt)) * 15;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 8: // rightFoot
 				{
-					float angle = (-sin(0.05 * timer_cnt)) * 25;
+					float angle = (-sin(freq * timer_cnt)) * 10;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
 				case 9: // leftLeg
 				{
-					float angle = sin(0.05 * timer_cnt) * 25;
+					float angle = sin(freq * timer_cnt) * 10;
 					rotation_matrix = rotate(mat4(1.0f), radians(angle), rotate_axis);
 				}
 					break;
@@ -324,23 +336,26 @@ mat4 My_Model(int index, int state)
 			}
 
 			if (m_shapes[index].parent != NULL) {
-				my_model = m_shapes[index].parent->nodeModel * inverse(translation_matrix) * rotation_matrix * translation_matrix;
+				my_model = m_shapes[index].parent->nodeModel * translation_matrix * rotation_matrix;
 			}
 			else {
-				my_model = move_matrix * translation_matrix * rotation_matrix;
+				my_model = move_matrix * scale_matrix * translation_matrix * rotation_matrix;
 			}
 			m_shapes[index].nodeModel = my_model;
 		}
 			break;
-		case STATE_JUMP:
-			rotate_axis = vec3(0.0, 1.0, 0.0);
-			rotation_matrix = rotate(mat4(1.0f), radians(mouseAngle), rotate_axis);
-			my_model = move_matrix * rotation_matrix;
-			break;
-		default: // _Default
+		default: // _Default 
+		{
 			rotate_axis = vec3(0.0, 1.0, 0.0);
 			rotation_matrix = rotate(mat4(1.0f), radians(timer_cnt), rotate_axis);
-			my_model = move_matrix * rotation_matrix;
+			if (m_shapes[index].parent != NULL) {
+				my_model = m_shapes[index].parent->nodeModel * translation_matrix;
+			}
+			else {
+				my_model = move_matrix * scale_matrix * translation_matrix * rotation_matrix;
+			}
+			m_shapes[index].nodeModel = my_model;
+		}
 			break;
 	}
 
@@ -375,6 +390,7 @@ void My_Display()
 		glDrawArrays(GL_TRIANGLES, 0, m_shapes[i].vertexCount);
 	}
 
+	My_mouseRotate();
 	// Change current display buffer to another one (refresh frame) 
 	glutSwapBuffers();
 }
@@ -434,6 +450,30 @@ void My_Keyboard(unsigned char key, int x, int y)
 	}
 }
 
+void My_SpecialKeys(int key, int x, int y)
+{
+	switch (key)
+	{
+		case GLUT_KEY_UP:
+		{
+			freq += 0.01;
+		}
+			break;
+		case GLUT_KEY_DOWN:
+		{
+			if (freq >= 0.0f) {
+				freq -= 0.01f;
+			}
+			else {
+				freq = 0.0f;
+			}
+		}
+			break;
+		default:
+			break;
+	}
+}
+
 void My_Menu(int id)
 {
 	switch (id)
@@ -452,12 +492,7 @@ void My_Menu(int id)
 		exit(0);
 		break;
 	case MENU_WALK:
-		// do something
 		m_state = STATE_WALK;
-		break;
-	case MENU_JUMP:
-		// do something
-		m_state = STATE_JUMP;
 		break;
 	case MENU_DEFAULT:
 		m_state = STATE_DEFAULT;
@@ -475,12 +510,12 @@ void My_Mouse(int button, int state, int x, int y)
 		if (state == GLUT_DOWN)
 		{
 			printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
-			startAngle = x;
+			startRotate = true;
 		}
 		else if (state == GLUT_UP)
 		{
 			printf("Mouse %d is released at (%d, %d)\n", button, x, y);
-			mouseAngle = x - startAngle;
+			startRotate = false;
 		}
 	}
 }
@@ -523,8 +558,7 @@ int main(int argc, char *argv[])
 	glutAddMenuEntry("Stop", MENU_TIMER_STOP);
 
 	glutSetMenu(menu_new);						// Tell GLUT to design the menu which id==menu_new now
-	glutAddMenuEntry("Walking", MENU_WALK);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
-	glutAddMenuEntry("Mario Jump", MENU_JUMP);		// Add submenu "Hello" in "New"(a menu which index is equal to menu_new)
+	glutAddMenuEntry("Walking", MENU_WALK);		// Add submenu "Walking" in "New"(a menu which index is equal to menu_new)
 	glutAddMenuEntry("Default", MENU_DEFAULT);
 
 	glutSetMenu(menu_main);
@@ -534,6 +568,7 @@ int main(int argc, char *argv[])
 	glutDisplayFunc(My_Display);
 	glutReshapeFunc(My_Reshape);
 	glutKeyboardFunc(My_Keyboard);
+	glutSpecialFunc(My_SpecialKeys);
 	glutTimerFunc(timer_speed, My_Timer, 0);
 	glutMouseFunc(My_Mouse);
 
